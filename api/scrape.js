@@ -3,15 +3,23 @@ import puppeteer from 'puppeteer-core';
 
 export default async function handler(req, res) {
   try {
+    const executablePath = await chromium.executablePath();
+
+    if (!executablePath) {
+      throw new Error('Chromium executable not found');
+    }
+
     const browser = await puppeteer.launch({
       args: chromium.args,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless
+      executablePath,
+      headless: chromium.headless,
+      defaultViewport: chromium.defaultViewport
     });
 
     const page = await browser.newPage();
     await page.goto('https://stocktwits.com/sentiment/trending', {
-      waitUntil: 'networkidle2'
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
     });
 
     const data = await page.evaluate(() => {
@@ -29,6 +37,9 @@ export default async function handler(req, res) {
     await browser.close();
     res.status(200).json({ tickers: data });
   } catch (error) {
-    res.status(500).json({ error: 'Scraper failed', details: error.message });
+    res.status(500).json({
+      error: 'Scraper failed',
+      details: error.message
+    });
   }
 }
